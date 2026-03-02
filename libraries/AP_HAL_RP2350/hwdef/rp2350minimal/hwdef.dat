@@ -1,0 +1,32 @@
+# rp2350 minimal hwdef
+# raspberry pi pico 2 (RP2350A, 4MB flash, 520KB SRAM)
+#
+# date: 2026-02-28
+
+define HAL_BOARD_NAME "rp2350-minimal"
+
+# no IMU in phase 1
+define HAL_INS_DEFAULT HAL_INS_NONE
+
+# no barometer in phase 1
+define HAL_BARO_DEFAULT HAL_BARO_NONE
+
+# serial ports
+#   SERIAL0 = USB CDC (console/mavlink)
+#   SERIAL1 = UART0 (GP0/GP1) - telem
+#   SERIAL2 = UART1 (GP4/GP5) - GPS
+
+# status LED on GP25 (onboard Pico 2 LED)
+define HAL_GPIO_LED_PIN 25
+
+# storage
+define HAL_STORAGE_SIZE 16384
+
+# logging disabled in phase 1 (no SD card)
+define HAL_LOGGING_BACKENDS_DEFAULT 0
+define HAL_LOGGING_STACK_SIZE 2048
+
+# filesystem disabled
+define AP_FILESYSTEM_ESP32_ENABLED 0
+
+define HAL_PROGRAM_SIZE_LIMIT_KB 4096

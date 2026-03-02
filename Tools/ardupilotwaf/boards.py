@@ -694,9 +694,23 @@ def add_dynamic_boards_esp32():
             else:
                 newclass = type(d, (esp32,), {'name': d})
 
+def add_dynamic_boards_rp2350():
+    '''add boards based on existence of hwdef.dat in subdirectories for RP2350'''
+    hwdef_dir = 'libraries/AP_HAL_RP2350/hwdef'
+    if not os.path.exists(hwdef_dir):
+        return
+    dirname, dirlist, filenames = next(os.walk(hwdef_dir))
+    for d in dirlist:
+        if d in _board_classes.keys():
+            continue
+        hwdef = os.path.join(dirname, d, 'hwdef.dat')
+        if os.path.exists(hwdef):
+            newclass = type(d, (rp2350,), {'name': d})
+
 def get_boards_names():
     add_dynamic_boards_chibios()
     add_dynamic_boards_esp32()
+    add_dynamic_boards_rp2350()
     add_dynamic_boards_linux()
     add_dynamic_boards_sitl()
 
@@ -1114,6 +1128,205 @@ class esp32s3(esp32):
         if hasattr(self, 'hwdef'):
             cfg.env.HWDEF = self.hwdef
         super(esp32s3, self).configure_env(cfg, env)
+
+class rp2350(Board):
+    abstract = True
+    toolchain = 'arm-none-eabi'
+
+    def configure(self, cfg):
+        super(rp2350, self).configure(cfg)
+        if not cfg.env.TOOLCHAIN:
+            self.toolchain = 'arm-none-eabi'
+
+    def configure_env(self, cfg, env):
+        env.BOARD_CLASS = "RP2350"
+        super(rp2350, self).configure_env(cfg, env)
+        cfg.load('rp2350')
+
+        env.DEFINES.update(
+            CONFIG_HAL_BOARD = 'HAL_BOARD_RP2350',
+            CONFIG_HAL_BOARD_SUBTYPE = 'HAL_BOARD_SUBTYPE_NONE',
+            AP_SIM_ENABLED = 0,
+        )
+
+        env.AP_LIBRARIES += [
+            'AP_HAL_RP2350',
+        ]
+        # put rp2350 stubs before system includes (for dirent.h override)
+        env.INCLUDES.insert(0, cfg.srcnode.abspath() + '/libraries/AP_HAL_RP2350/targets/rp2350')
+
+        env.CFLAGS += [
+            '-fno-inline-functions',
+            '-fsingle-precision-constant',
+            '-ffunction-sections',
+            '-fdata-sections',
+            '-fno-exceptions',
+            '-Wall',
+            '-Wextra',
+            '-Wno-sign-compare',
+            '-Wno-missing-field-initializers',
+            '-mthumb',
+            '-mcpu=cortex-m33',
+            '-mfloat-abi=hard',
+            '-mfpu=fpv5-sp-d16',
+            '--specs=nosys.specs',
+        ]
+        try:
+            env.CFLAGS.remove('-Werror=undef')
+        except ValueError:
+            pass
+
+        env.CXXFLAGS += env.CFLAGS + [
+            '-fno-rtti',
+            '-fno-threadsafe-statics',
+        ]
+        try:
+            env.CXXFLAGS.remove('-Werror=undef')
+        except ValueError:
+            pass
+        try:
+            env.CXXFLAGS.remove('-Werror=shadow')
+        except ValueError:
+            pass
+
+        env.LINKFLAGS += [
+            '-mthumb',
+            '-mcpu=cortex-m33',
+            '-mfloat-abi=hard',
+            '-mfpu=fpv5-sp-d16',
+            '--specs=nosys.specs',
+        ]
+
+        # produce static library for cmake linking
+        env.AP_PROGRAM_AS_STLIB = True
+
+        # include paths for pico sdk and freertos headers
+        pico_sdk = os.environ.get(
+            'PICO_SDK_PATH',
+            cfg.srcnode.abspath() + '/modules/pico-sdk'
+        )
+        freertos = os.environ.get(
+            'FREERTOS_KERNEL_PATH',
+            cfg.srcnode.abspath() + '/modules/FreeRTOS-Kernel'
+        )
+
+        # freertos kernel includes
+        env.INCLUDES += [
+            freertos + '/include',
+            freertos + '/portable/ThirdParty/GCC/RP2350_ARM_NTZ/non_secure',
+        ]
+
+        # FreeRTOSConfig.h location
+        env.INCLUDES += [
+            cfg.srcnode.abspath() + '/libraries/AP_HAL_RP2350/targets/rp2350',
+        ]
+
+        # pico sdk includes (complete list extracted from cmake DependInfo)
+        pico_includes = [
+            'src/boards/include',
+            'src/common/boot_picobin_headers/include',
+            'src/common/boot_picoboot_headers/include',
+            'src/common/hardware_claim/include',
+            'src/common/pico_base_headers/include',
+            'src/common/pico_binary_info/include',
+            'src/common/pico_bit_ops_headers/include',
+            'src/common/pico_divider_headers/include',
+            'src/common/pico_stdlib_headers/include',
+            'src/common/pico_sync/include',
+            'src/common/pico_time/include',
+            'src/common/pico_usb_reset_interface_headers/include',
+            'src/common/pico_util/include',
+            'src/rp2350/boot_stage2/include',
+            'src/rp2350/hardware_regs/include',
+            'src/rp2350/hardware_structs/include',
+            'src/rp2350/pico_platform/include',
+            'src/rp2_common/boot_bootrom_headers/include',
+            'src/rp2_common/hardware_adc/include',
+            'src/rp2_common/hardware_base/include',
+            'src/rp2_common/hardware_boot_lock/include',
+            'src/rp2_common/hardware_clocks/include',
+            'src/rp2_common/hardware_dcp/include',
+            'src/rp2_common/hardware_divider/include',
+            'src/rp2_common/hardware_exception/include',
+            'src/rp2_common/hardware_flash/include',
+            'src/rp2_common/hardware_gpio/include',
+            'src/rp2_common/hardware_i2c/include',
+            'src/rp2_common/hardware_irq/include',
+            'src/rp2_common/hardware_pll/include',
+            'src/rp2_common/hardware_pwm/include',
+            'src/rp2_common/hardware_rcp/include',
+            'src/rp2_common/hardware_resets/include',
+            'src/rp2_common/hardware_spi/include',
+            'src/rp2_common/hardware_sync/include',
+            'src/rp2_common/hardware_sync_spin_lock/include',
+            'src/rp2_common/hardware_ticks/include',
+            'src/rp2_common/hardware_timer/include',
+            'src/rp2_common/hardware_uart/include',
+            'src/rp2_common/hardware_vreg/include',
+            'src/rp2_common/hardware_watchdog/include',
+            'src/rp2_common/hardware_xip_cache/include',
+            'src/rp2_common/hardware_xosc/include',
+            'src/rp2_common/pico_atomic/include',
+            'src/rp2_common/pico_bootrom/include',
+            'src/rp2_common/pico_double/include',
+            'src/rp2_common/pico_fix/rp2040_usb_device_enumeration/include',
+            'src/rp2_common/pico_flash/include',
+            'src/rp2_common/pico_float/include',
+            'src/rp2_common/pico_malloc/include',
+            'src/rp2_common/pico_multicore/include',
+            'src/rp2_common/pico_platform_common/include',
+            'src/rp2_common/pico_platform_compiler/include',
+            'src/rp2_common/pico_platform_panic/include',
+            'src/rp2_common/pico_platform_sections/include',
+            'src/rp2_common/pico_printf/include',
+            'src/rp2_common/pico_runtime/include',
+            'src/rp2_common/pico_runtime_init/include',
+            'src/rp2_common/pico_stdio/include',
+            'src/rp2_common/pico_stdio_usb/include',
+            'src/rp2_common/pico_time_adapter/include',
+            'src/rp2_common/pico_unique_id/include',
+            'src/rp2_common/cmsis/include',
+            'src/rp2_common/cmsis/stub/CMSIS/Core/Include',
+            'src/rp2_common/cmsis/stub/CMSIS/Device/RP2350/Include',
+        ]
+        for inc in pico_includes:
+            env.INCLUDES += [pico_sdk + '/' + inc]
+
+        # tinyusb includes
+        env.INCLUDES += [
+            pico_sdk + '/lib/tinyusb/src',
+            pico_sdk + '/src/rp2_common/pico_stdio_usb/include',
+        ]
+
+        # generated includes from cmake build (autogenerated config headers)
+        # these will be available after cmake configure step
+        bldnode = cfg.bldnode.make_node(cfg.variant)
+        cmake_gen = bldnode.make_node('rp2350-build/generated/pico_base').abspath()
+        env.INCLUDES += [cmake_gen]
+
+        # hwdef include path
+        hwdef_dir = os.path.join(
+            cfg.srcnode.abspath(),
+            'libraries/AP_HAL_RP2350/hwdef',
+            self.get_name()
+        )
+        env.INCLUDES += [hwdef_dir]
+
+    def pre_build(self, bld):
+        '''pre-build hook that gets called before dynamic sources'''
+        from waflib.Context import load_tool
+        module = load_tool('rp2350', [], with_sys_path=True)
+        fun = getattr(module, 'pre_build', None)
+        if fun:
+            fun(bld)
+        super(rp2350, self).pre_build(bld)
+
+    def build(self, bld):
+        super(rp2350, self).build(bld)
+        bld.load('rp2350')
+
+    def get_name(self):
+        return self.__class__.__name__
 
 class chibios(Board):
     abstract = True
