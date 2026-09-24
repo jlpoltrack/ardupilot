@@ -83,6 +83,9 @@ private:
     CanardTxTransfer tx_transfer;
     dronecan_protocol_Stats protocol_stats;
 
+    // last time the HAL accepted a frame on each interface
+    uint64_t last_tx_accept_us[HAL_NUM_CAN_IFACES];
+
     // auxillary 11 bit CANSensor
     CANSensor *aux_11bit_driver;
 };

@@ -218,8 +218,11 @@ void CanardInterface::processTx(bool raw_commands_only = false) {
         // we need to ensure that this is not optimized
         volatile const auto *stats = ifaces[iface]->get_statistics();
         uint64_t last_transmit_us = stats==nullptr?0:stats->last_transmit_us;
+        const uint64_t now_us = AP_HAL::micros64();
         bool iface_down = true;
-        if (stats == nullptr || (AP_HAL::micros64() - last_transmit_us) < 200000UL) {
+        // an idle interface is not down, only one that has stopped accepting and completing frames
+        if (stats == nullptr || (now_us - last_transmit_us) < 200000UL ||
+            (now_us - last_tx_accept_us[iface]) < 200000UL) {
             /*
             We were not able to queue the frame for
             sending. Only mark the send as failing if the
@@ -263,6 +266,8 @@ void CanardInterface::processTx(bool raw_commands_only = false) {
                 // try sending to interfaces, clearing the mask if we succeed
                 if (ifaces[iface]->send(txmsg, txf->deadline_usec, 0) > 0) {
                     txf->iface_mask &= ~(1U<<iface);
+                    last_tx_accept_us[iface] = AP_HAL::micros64();
+                    iface_down = false;
                 } else {
                     // if we fail to send then we try sending on next interface
                     if (!iface_down) {
