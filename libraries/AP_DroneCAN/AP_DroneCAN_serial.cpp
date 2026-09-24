@@ -67,11 +67,16 @@ void AP_DroneCAN_Serial::init(AP_DroneCAN *_dronecan)
 void AP_DroneCAN_Serial::update(void)
 {
     const uint32_t now_ms = AP_HAL::millis();
+    const uint32_t now_us = AP_HAL::micros();
     for (auto &p : ports) {
         if (p.baudrate == 0) {
             continue;
         }
         if (p.writebuffer == nullptr || p.node <= 0 || p.idx < 0) {
+            continue;
+        }
+        // pace output to the configured baudrate, as a real UART would
+        if (int32_t(now_us - p.tx_ready_us) < 0) {
             continue;
         }
         uavcan_tunnel_Targetted pkt {};
@@ -113,6 +118,9 @@ void AP_DroneCAN_Serial::update(void)
             p.writebuffer->advance(n);
             p.tx_stats_bytes += n;
             p.last_send_ms = now_ms;
+            // assume 10 bits per byte; carry over loop lateness unless the port was idle
+            const uint32_t tx_time_us = n * 10000000UL / p.baudrate;
+            p.tx_ready_us = (now_us - p.tx_ready_us < tx_time_us ? p.tx_ready_us : now_us) + tx_time_us;
         }
     }
 }
