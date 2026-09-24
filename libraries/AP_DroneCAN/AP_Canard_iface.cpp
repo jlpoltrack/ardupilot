@@ -282,6 +282,18 @@ void CanardInterface::processTx(bool raw_commands_only = false) {
 
 }
 
+uint16_t CanardInterface::tx_queue_frames(uint16_t data_type_id)
+{
+    WITH_SEMAPHORE(_sem_tx);
+    uint16_t count = 0;
+    for (auto *txq = canard.tx_queue; txq != nullptr; txq = txq->next) {
+        if (txq->frame.iface_mask != 0 && CANARD_MSG_TYPE_FROM_ID(txq->frame.id) == data_type_id) {
+            count++;
+        }
+    }
+    return count;
+}
+
 void CanardInterface::update_rx_protocol_stats(int16_t res)
 {
     switch (-res) {

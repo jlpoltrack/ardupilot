@@ -20,6 +20,11 @@ AP_DroneCAN_Serial *AP_DroneCAN_Serial::serial[HAL_MAX_CAN_PROTOCOL_DRIVERS];
 #define AP_DRONECAN_SERIAL_MIN_RXSIZE 2048
 #endif
 
+// max unsent tunnel frames in the TX queue, two full transfers
+#ifndef AP_DRONECAN_SERIAL_MAX_TX_FRAMES
+#define AP_DRONECAN_SERIAL_MAX_TX_FRAMES 38
+#endif
+
 /*
   initialise DroneCAN serial aports
 */
@@ -77,6 +82,10 @@ void AP_DroneCAN_Serial::update(void)
         }
         // pace output to the configured baudrate, as a real UART would
         if (int32_t(now_us - p.tx_ready_us) < 0) {
+            continue;
+        }
+        // don't queue more while earlier transfers are unsent, or they may expire and be lost
+        if (dronecan->get_canard_iface().tx_queue_frames(UAVCAN_TUNNEL_TARGETTED_ID) >= AP_DRONECAN_SERIAL_MAX_TX_FRAMES) {
             continue;
         }
         uavcan_tunnel_Targetted pkt {};

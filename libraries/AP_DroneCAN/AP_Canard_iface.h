@@ -39,6 +39,9 @@ public:
     void processTx(bool raw_commands_only);
     void processRx();
 
+    // number of frames of a message type queued but not yet sent on any interface
+    uint16_t tx_queue_frames(uint16_t data_type_id);
+
     void process(uint32_t duration);
 
     static void onTransferReception(CanardInstance* ins, CanardRxTransfer* transfer);
